@@ -1,36 +1,46 @@
 #!/usr/bin/env python3
 """
-Controlador por marcas de fotograma (versión unidireccional).
+Controlador de interacción mutua entre dos Pi.
 
-La reproducción de ESTA Pi (controladora) es la "partitura": cuando pasa por
-ciertos fotogramas de ciertos clips, la Pi reproductora salta a otro clip
-y/o a otro fotograma.
+El MISMO archivo se copia en las dos Pi y se lanza con su rol:
+    python3 controlador.py controladora
+    python3 controlador.py reproductora
+
+Cada Pi vigila su propia reproducción. Cuando pasa por una marca de la tabla
+REGLAS cuyo "disparador" es ella, ordena a la OTRA Pi cambiar de clip y/o
+saltar a un fotograma. Cada Pi ignora las reglas del otro.
 """
-import socket, json, time, threading, os
+import socket, json, time, threading, os, sys
 
 LOCAL_SOCKET = "/tmp/mpvsocket"
-REMOTA_DIR = ("192.168.1.2", 5000)
+PARES = {
+    "controladora": ("192.168.1.1", 5000),
+    "reproductora": ("192.168.1.2", 5000),
+}
 FPS_POR_DEFECTO = 25
 
 # ---------------------------------------------------------------------------
-# REGLAS: (clip local, fotograma local) -> (clip remoto, fotograma remoto)
-#   - Los nombres son solo el nombre del archivo, p. ej. "01_mar.mp4".
-#   - clip remoto = None  -> no cambia de clip, solo salta dentro del actual.
-# Edita esta tabla a tu gusto.
+# REGLAS (idénticas en las dos Pi):
+#   (quién dispara, clip donde está la marca, fotograma de la marca,
+#    clip destino en la OTRA Pi, fotograma destino)
+#   - clip destino = None -> no cambia de clip, solo salta dentro del actual.
+#   - Solo el nombre del archivo, p. ej. "01_a.mp4".
 # ---------------------------------------------------------------------------
 REGLAS = [
-    ("01-a.mp4", 186, "01-x.mp4", 320),
-    ("01-a.mp4", 318, "01-x.mp4", 480),
-    ("01-a.mp4", 423, "01-x.mp4", 680),
-    ("01-a.mp4", 555, "01-x.mp4", 1006),
-    ("01-a.mp4", 853, "01-x.mp4", 1239),
-    ("01-a.mp4", 1364 "01-x.mp4", 1540),
-    # ("02-b.mp4", 150, None,       900),
+    ("controladora", "01_a.mp4", 100, "01_x.mp4", 0),
+    ("controladora", "01_a.mp4", 300, "01_x.mp4", 450),
+    ("reproductora", "01_x.mp4", 200, "01_a.mp4", 50),
+    ("reproductora", "02_y.mp4", 120, None,       400),
 ]
 
-# Ignora saltos grandes de fotograma (p. ej. un seek) para no disparar marcas
-# que en realidad no se han "recorrido" reproduciendo.
-SALTO_MAXIMO = 15
+SALTO_MAXIMO = 15     # ignora saltos grandes de fotograma (seeks): no cuentan como "recorridos"
+PAUSA_MINIMA = 1.0    # segundos mínimos entre dos disparos de esta Pi (freno anti-bucles)
+
+# ---------------------------------------------------------------------------
+if len(sys.argv) != 2 or sys.argv[1] not in PARES:
+    sys.exit("Uso: controlador.py controladora|reproductora")
+YO = sys.argv[1]
+OTRA = "reproductora" if YO == "controladora" else "controladora"
 
 
 def log(*a):
@@ -71,7 +81,8 @@ class MPV:
 
 
 LOCAL = MPV("local", socket.AF_UNIX, LOCAL_SOCKET)
-REMOTA = MPV("remota", socket.AF_INET, REMOTA_DIR)
+PAR = MPV(OTRA, socket.AF_INET, PARES[OTRA])
+_ultimo_disparo = 0.0
 
 
 def nombre_clip(ruta):
@@ -88,29 +99,40 @@ def esperar_clip(p, clip, timeout=4):
     return False
 
 
-def mandar_a_remota(clip, fotograma):
-    """Cambia (si hace falta) de clip en la reproductora y salta al fotograma."""
+def mandar_al_par(clip, fotograma):
+    """Cambia (si hace falta) de clip en la otra Pi y salta al fotograma."""
     try:
-        if clip and nombre_clip(REMOTA.get("path")) != clip:
-            lista = REMOTA.get("playlist") or []
+        if clip and nombre_clip(PAR.get("path")) != clip:
+            lista = PAR.get("playlist") or []
             indices = [i for i, e in enumerate(lista) if nombre_clip(e.get("filename")) == clip]
             if not indices:
-                log(f"[remota] el clip {clip} no está en su lista de reproducción")
+                log(f"[{OTRA}] el clip {clip} no está en su lista de reproducción")
                 return
-            REMOTA.cmd("playlist-play-index", indices[0])
-            if not esperar_clip(REMOTA, clip):
-                log(f"[remota] no se pudo cargar {clip}")
+            PAR.cmd("playlist-play-index", indices[0])
+            if not esperar_clip(PAR, clip):
+                log(f"[{OTRA}] no se pudo cargar {clip}")
                 return
-        fps = REMOTA.get("container-fps") or FPS_POR_DEFECTO
-        REMOTA.cmd("seek", fotograma / fps, "absolute+exact")
-        REMOTA.cmd("set_property", "pause", False)
-        log(f"[remota] -> {clip or '(mismo clip)'} fotograma {fotograma}")
+        fps = PAR.get("container-fps") or FPS_POR_DEFECTO
+        PAR.cmd("seek", fotograma / fps, "absolute+exact")
+        PAR.cmd("set_property", "pause", False)
+        log(f"[{OTRA}] -> {clip or '(mismo clip)'} fotograma {fotograma}")
     except Exception as e:
-        log("[remota] error:", e)
+        log(f"[{OTRA}] error:", e)
+
+
+def disparar(clip, fotograma):
+    global _ultimo_disparo
+    ahora = time.time()
+    if ahora - _ultimo_disparo < PAUSA_MINIMA:
+        log("[freno] disparo ignorado (demasiado seguido)")
+        return
+    _ultimo_disparo = ahora
+    threading.Thread(target=mandar_al_par, args=(clip, fotograma), daemon=True).start()
 
 
 def vigilar_local():
     """Observa la reproducción local y dispara las reglas al cruzar cada marca."""
+    mis_reglas = [r[1:] for r in REGLAS if r[0] == YO]
     while True:
         try:
             with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
@@ -130,18 +152,17 @@ def vigilar_local():
 
                     if msg["name"] == "path":
                         clip, fps, ultimo = nombre_clip(dato), None, None
-                        log(f"[local] clip: {clip}")
+                        log(f"[{YO}] clip: {clip}")
 
                     elif msg["name"] == "time-pos" and dato is not None and clip:
                         if fps is None:
                             fps = LOCAL.get("container-fps") or FPS_POR_DEFECTO
                         frame = int(dato * fps)
                         if ultimo is not None and 0 < frame - ultimo <= SALTO_MAXIMO:
-                            for c_loc, f_loc, c_rem, f_rem in REGLAS:
+                            for c_loc, f_loc, c_dst, f_dst in mis_reglas:
                                 if c_loc == clip and ultimo < f_loc <= frame:
-                                    log(f"[local] marca {clip}:{f_loc}")
-                                    threading.Thread(target=mandar_a_remota,
-                                                     args=(c_rem, f_rem), daemon=True).start()
+                                    log(f"[{YO}] marca {clip}:{f_loc}")
+                                    disparar(c_dst, f_dst)
                         ultimo = frame
         except OSError:
             pass
@@ -149,5 +170,6 @@ def vigilar_local():
 
 
 if __name__ == "__main__":
+    log(f"Rol: {YO} | par: {OTRA} {PARES[OTRA]}")
     time.sleep(10)   # deja arrancar el escritorio y mpv
     vigilar_local()
