@@ -1,0 +1,14 @@
+# reglas.csv - composición de la interacción entre las dos Pi
+#
+# Formato (5 campos separados por comas, una regla por línea):
+#   quién dispara, clip de la marca, fotograma de la marca, clip destino, fotograma destino
+#
+#   - quién dispara: controladora o reproductora
+#   - clip destino:  "-" = no cambia de clip, solo salta dentro del actual
+#   - Las líneas que empiezan por # y las líneas vacías se ignoran.
+#   - Este archivo debe ser idéntico en las dos Pi. Se recarga solo al guardarlo.
+
+controladora, 01_a.mp4, 100, 01_x.mp4, 0
+controladora, 01_a.mp4, 300, 01_x.mp4, 450
+reproductora, 01_x.mp4, 200, 01_a.mp4, 50
+reproductora, 01_x.mp4, 400, -,        120
