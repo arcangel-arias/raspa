@@ -8,7 +8,17 @@
 #   - Las líneas que empiezan por # y las líneas vacías se ignoran.
 #   - Este archivo debe ser idéntico en las dos Pi. Se recarga solo al guardarlo.
 
-controladora, 01_a.mp4, 100, 01_x.mp4, 0
-controladora, 01_a.mp4, 300, 01_x.mp4, 450
-reproductora, 01_x.mp4, 200, 01_a.mp4, 50
-reproductora, 01_x.mp4, 400, -,        120
+controladora, 01_a.mp4, 186, 01_x.mp4, 0
+controladora, 01_a.mp4, 318, 01_x.mp4, 0
+controladora, 01_a.mp4, 423, 01_x.mp4, 0
+controladora, 01_a.mp4, 555, 01_x.mp4, 0
+controladora, 01_a.mp4, 853, 01_x.mp4, 0
+controladora, 01_a.mp4, 1364, 01_x.mp4, 0
+reproductora, 01_x.mp4, 320, 01_a.mp4, 0
+reproductora, 01_x.mp4, 480, 01_a.mp4, 0
+reproductora, 01_x.mp4, 680, 01_a.mp4, 0
+reproductora, 01_x.mp4, 1006, 01_a.mp4, 0
+reproductora, 01_x.mp4, 1239, 01_a.mp4, 0
+reproductora, 01_x.mp4, 1540, 01_a.mp4, 0
+
+# reproductora, 01_x.mp4, 400, -,        120
