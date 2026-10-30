@@ -8,17 +8,15 @@
 #   - Las líneas que empiezan por # y las líneas vacías se ignoran.
 #   - Este archivo debe ser idéntico en las dos Pi. Se recarga solo al guardarlo.
 
-controladora, 01_a.mp4, 186, 01_x.mp4, 0
-controladora, 01_a.mp4, 318, 01_x.mp4, 0
-controladora, 01_a.mp4, 423, 01_x.mp4, 0
-controladora, 01_a.mp4, 555, 01_x.mp4, 0
-controladora, 01_a.mp4, 853, 01_x.mp4, 0
-controladora, 01_a.mp4, 1364, 01_x.mp4, 0
-reproductora, 01_x.mp4, 320, 01_a.mp4, 0
-reproductora, 01_x.mp4, 480, 01_a.mp4, 0
-reproductora, 01_x.mp4, 680, 01_a.mp4, 0
-reproductora, 01_x.mp4, 1006, 01_a.mp4, 0
-reproductora, 01_x.mp4, 1239, 01_a.mp4, 0
+controladora, 01_a.mp4, 186,  01_x.mp4, 300
+controladora, 01_a.mp4, 318,  01_x.mp4, 460
+controladora, 01_a.mp4, 423,  01_x.mp4, 660
+controladora, 01_a.mp4, 555,  01_x.mp4, 990
+controladora, 01_a.mp4, 853,  01_x.mp4, 1230
+controladora, 01_a.mp4, 1364, 01_x.mp4, 1500
+reproductora, 01_x.mp4, 320,  01_a.mp4, 300
+reproductora, 01_x.mp4, 480,  01_a.mp4, 410
+reproductora, 01_x.mp4, 680,  01_a.mp4, 540
+reproductora, 01_x.mp4, 1006, 01_a.mp4, 840
+reproductora, 01_x.mp4, 1239, 01_a.mp4, 1330
 reproductora, 01_x.mp4, 1540, 01_a.mp4, 0
-
-# reproductora, 01_x.mp4, 400, -,        120
