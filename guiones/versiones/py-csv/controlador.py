@@ -6,6 +6,7 @@ El MISMO archivo se copia en las dos Pi y se lanza con su rol:
     python3 controlador.py controladora
     python3 controlador.py reproductora
 
+Una marca en el fotograma 0 significa "al EMPEZAR ese clip".
 Las reglas se leen de "reglas.csv" (en la misma carpeta que este script) y se
 recargan solas cada vez que guardas el archivo: no hace falta reiniciar nada.
 
@@ -25,6 +26,7 @@ REGLAS_ARCHIVO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "regla
 
 SALTO_MAXIMO = 15     # ignora saltos grandes de fotograma (seeks): no cuentan como "recorridos"
 PAUSA_MINIMA = 1.0    # segundos mínimos entre dos disparos de esta Pi (freno anti-bucles)
+ALINEAR_AL_ARRANCAR = True   # al conectar por primera vez, reinicia el clip local para partir de 0
 
 # ---------------------------------------------------------------------------
 if len(sys.argv) != 2 or sys.argv[1] not in PARES:
@@ -193,6 +195,23 @@ def disparar(clip, fotograma):
     threading.Thread(target=mandar_al_par, args=(clip, fotograma), daemon=True).start()
 
 
+_primera_vez = True
+
+
+def al_empezar_clip(clip):
+    """Dispara las reglas con marca en el fotograma 0 (= 'al empezar el clip')."""
+    global _primera_vez
+    reglas = [r for r in REGLAS.mias() if r[0] == clip and r[1] == 0]
+    primera, _primera_vez = _primera_vez, False
+    if not reglas:
+        return
+    if primera and ALINEAR_AL_ARRANCAR:
+        LOCAL.cmd("seek", 0, "absolute+exact")   # el clip ya iba empezado: se reinicia para partir juntas
+    for _, _, c_dst, f_dst in reglas:
+        log(f"[{YO}] inicio de {clip}")
+        disparar(c_dst, f_dst)
+
+
 def vigilar_local():
     """Observa la reproducción local y dispara las reglas al cruzar cada marca."""
     while True:
@@ -215,6 +234,8 @@ def vigilar_local():
                     if msg["name"] == "path":
                         clip, fps, ultimo = nombre_clip(dato), None, None
                         log(f"[{YO}] clip: {clip}")
+                        if clip:
+                            al_empezar_clip(clip)
 
                     elif msg["name"] == "time-pos" and dato is not None and clip:
                         if fps is None:
